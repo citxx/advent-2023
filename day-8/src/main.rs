@@ -22,7 +22,7 @@ fn main() {
     println!("Part 2: {}", part_two(&directions, &map));
 }
 
-fn part_one(directions: &str, map: &HashMap<&str, (&str, &str)>) -> i64 { 
+fn part_one(directions: &str, map: &HashMap<&str, (&str, &str)>) -> i64 {
     let mut cur_node = "AAA";
     let mut steps_cnt = 0;
     let mut dirs_iter = directions.chars().cycle();
@@ -42,30 +42,65 @@ fn part_one(directions: &str, map: &HashMap<&str, (&str, &str)>) -> i64 {
     steps_cnt
 }
 
-fn part_two(directions: &str, map: &HashMap<&str, (&str, &str)>) -> i64 { 
+fn part_two(directions: &str, map: &HashMap<&str, (&str, &str)>) -> i64 {
     let mut ordered_nodes: Vec<&str> = map.keys().map(|&x| x).collect();
     ordered_nodes.sort();
-    let node_to_index: HashMap<&str, usize> = ordered_nodes.iter().enumerate().map(|(idx, &node)| (node, idx)).collect();
-    let start_vec = Vector::new(ordered_nodes.iter().map(|node| if node.ends_with("A") { 1 } else { 0 }).collect::<Vec<u64>>());
-    let target_vec = Vector::new(ordered_nodes.iter().map(|node| if node.ends_with("Z") { 1 } else { 0 }).collect::<Vec<u64>>());
-    println!("{:?}", start_vec);
-    let mut steps_cnt = 0;
-    //let mut dirs_iter = directions.chars().cycle();
-    //while !cur_nodes.iter().all(|node| node.ends_with("Z")) {
-        //let dir = dirs_iter.next().unwrap();
-        //cur_nodes = cur_nodes.into_iter().map(|node| {
-            //if let (left, right) = map[node] {
-                //match dir {
-                    //'L' => left,
-                    //'R' => right,
-                    //_ => panic!(),
-                //}
-            //} else {
-                //panic!();
-            //}
-        //}).collect();
-        //steps_cnt += 1;
-    //}
-    //println!("{} {:?}", cur_nodes.iter().filter(|node| node.chars().last() == Some('Z')).count(), cur_nodes);
-    steps_cnt
+    let mut cur_nodes: HashSet<&str> = ordered_nodes
+        .iter()
+        .filter(|node| node.ends_with("A"))
+        .map(|&x| x)
+        .collect();
+    let mut steps_cnt: i128 = 1;
+    // Limited solution. It works only because in the input there's exactly one final position in
+    // each cycle and it first comes exactly in one cycle length.
+    for node in cur_nodes.iter() {
+        let desert_loop = find_loop(directions, map, node);
+        steps_cnt = lcm(steps_cnt, desert_loop.cycle_ends.len() as i128);
+    }
+    steps_cnt as i64
+}
+
+fn gcd(a: i128, b: i128) -> i128 {
+    let mut a = a;
+    let mut b = b;
+    while b != 0 {
+        (a, b) = (b, a % b);
+    }
+    a
+}
+
+fn lcm(a: i128, b: i128) -> i128 {
+    a / gcd(a, b) * b
+}
+
+#[derive(Debug)]
+struct DesertLoop {
+    prefix_ends: Vec<bool>,
+    cycle_ends: Vec<bool>,
+}
+
+fn find_loop(directions: &str, map: &HashMap<&str, (&str, &str)>, start: &str) -> DesertLoop {
+    let mut visited_to_global_pos: HashMap<(&str, usize), usize> = HashMap::new();
+    let mut path_ends: Vec<bool> = Vec::new();
+    let dirs_with_pos = directions.chars().enumerate();
+    let mut cur_node = start;
+    for (global_pos, (dir_pos, dir)) in dirs_with_pos.cycle().enumerate() {
+        let to_visit = (cur_node, dir_pos);
+        if let Some(prev_global_pos) = visited_to_global_pos.get(&to_visit) {
+            let cycle_ends = path_ends.split_off(*prev_global_pos);
+            return DesertLoop {
+                prefix_ends: path_ends,
+                cycle_ends,
+            };
+        }
+        visited_to_global_pos.insert(to_visit, global_pos);
+        path_ends.push(cur_node.ends_with("Z"));
+        let (left, right) = map[cur_node];
+        cur_node = match dir {
+            'L' => left,
+            'R' => right,
+            _ => panic!(),
+        }
+    }
+    panic!();
 }
